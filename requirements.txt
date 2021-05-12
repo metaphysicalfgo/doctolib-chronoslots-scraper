@@ -1,0 +1,7 @@
+requests
+beautifulsoup4
+tqdm
+argparse
+html5lib
+p_tqdm
+selenium
