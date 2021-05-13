@@ -1,11 +1,15 @@
 import argparse
 import csv
+import os
+import signal
 import json
 from datetime import datetime
+import time
 from functools import reduce
 from random import choice
 
 from multiprocessing import Pool, cpu_count, current_process, freeze_support
+from types import resolve_bases
 from tqdm import tqdm
 from p_tqdm import p_map 
 
@@ -39,25 +43,35 @@ DOCTOLIB_URL = "www.doctolib.fr"
 DOCTOLIB_CHRONODOSE_FILTER = "force_max_limit=2"
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--output", default='output_$CITY_$DATE.txt', type=str, help="Output filename (available variables: $CITY, $DATE)")
-parser.add_argument("--limit", type=int, default=20, help="Set the maximum number of Doctolib search pages")
+parser.add_argument("--limit", type=int, default=5, help="Set the maximum number of Doctolib search pages")
 parser.add_argument("--city", type=str, default="paris", help="The city to base the search on (default: Paris)")
-parser.add_argument("--auto_browse", type=str, default="None", help="Experimental / DO NOT USE (works only with Brave on MacOS X")
+parser.add_argument("--auto_browse", type=str, default="None", help="WARN: currently only works with Brave on OS X")
+parser.add_argument("--background", type=bool, default=False, help="Background mode")
+parser.add_argument("--notify", type=bool, default=False, help="WARN: currently only works on OS X")
 
 args = parser.parse_args()
-city = str.lower(args.city)
-output = str(args.output).replace("$DATE", datetime.now().strftime("%Y%m%d%H%M%S")).replace("$CITY", city)
 
 def random_headers():
     return {'User-Agent': choice(desktop_agents),
             'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8'}
 
-def doctolib():
+def os_notify(title, subtitle, message):
+    t = '-title {!r}'.format(title)
+    s = '-subtitle {!r}'.format(subtitle)
+    m = '-message {!r}'.format(message)
+    os.system('terminal-notifier {}'.format(' '.join([m, t, s])))
+
+def handler(signum, frame):
+    print("Thanks for using me. Bye.")
+    exit(1)
+ 
+signal.signal(signal.SIGINT, handler)
+
+def get_centers(city, limit):
     results = []
     doctolib_url = "/vaccination-covid-19/{}?{}&ref_visit_motive_ids[]=6970&ref_visit_motive_ids[]=7005"
     doctolib_url_2 = "/vaccination-covid-19/{}?page={}&{}&ref_visit_motive_ids[]=6970&ref_visit_motive_ids[]=7005"
-
-    max_nb_page = args.limit
+    max_nb_page = limit
 
     conn = httpclient.HTTPSConnection(DOCTOLIB_URL)
     conn.request("GET", doctolib_url.format(city, DOCTOLIB_CHRONODOSE_FILTER), headers=random_headers())
@@ -95,66 +109,73 @@ def doctolib_link_finder(soup_object):
     return found_links
 
 
-def check_center_json_and_write_to_csv(url: str):
+def retrieve_center_data(url: str):
     conn = httpclient.HTTPSConnection(DOCTOLIB_URL)
     conn.request("GET", url)
     resp = conn.getresponse()
     resptext = resp.read().decode()
     respjson = json.loads(resptext)
     if("search_result" in respjson):
-        with open(output, 'a', newline='') as csv_file:
-            csv_writer = csv.writer(csv_file, delimiter=",", quoting=csv.QUOTE_ALL)
-            line_to_write = []
-            line_to_write.append(respjson['total'])
-            line_to_write.append(respjson['search_result']['city'])
-            line_to_write.append(respjson['search_result']['last_name'])
-            line_to_write.append("https://{}{}".format(DOCTOLIB_URL, respjson['search_result']['link']))
-            csv_writer.writerow(line_to_write)
+        center_data = []
+        center_data.append(respjson['total'])
+        center_data.append(respjson['search_result']['city'])
+        center_data.append(respjson['search_result']['last_name'])
+        center_data.append("https://{}{}".format(DOCTOLIB_URL, respjson['search_result']['link']))
+        return center_data
 
 
-def scrape():
-    start_time = datetime.now()
+def process_center_availabilities_once(center_data_links, notify=False):
+    proc_units = min((cpu_count() - 1), len(center_data_links))
+    res = None
+    with Pool(proc_units):
+        res = p_map(retrieve_center_data, center_data_links)
 
-    print("Retrieving list of proximity centers...")
-    results = doctolib()
-    print()
-
-    links = []
-    for i in results:
-        links.append(i['link'])
-
-    items = len(links)
-    units = min((cpu_count() - 1), items)
-    print("Checking every centers for available slots...")
-    with Pool(units):
-        p_map(check_center_json_and_write_to_csv, links)
-    print()
-    stop_time_2 = datetime.now()
-
-    # processing the results stored in the csv file in the doctolib directory
-    res = []
-    with open(output) as f:
-        csv_reader = csv.reader(f, delimiter=",", quoting=csv.QUOTE_ALL)
-        for line in csv_reader:
-            res.append(line)
-
-    total_with_slots = 0
-    for centre in res:
-        if int(centre[0]) > 0:
-            total_with_slots += 1
-            print("ALERT : {} slots available at {} ({}) => {}".format(centre[0], centre[2], centre[1], centre[3]))
+    centers_with_slots = 0
+    total_slots_found = 0
+    for r in res:
+        if int(r[0]) > 0:
+            centers_with_slots += 1
+            total_slots_found += int(r[0])
+            print("ALERT:")
+            print("       {} slots available at {} ({})".format(r[0], r[2], r[1]))
+            print("       -> {}".format(r[3]))
             if args.auto_browse == "Brave":
                 options = Options()
                 options.binary_location = '/Applications/Brave Browser.app/Contents/MacOS/Brave Browser'
                 driver_path = '/usr/local/bin/chromedriver'
                 drvr = webdriver.Chrome(options = options, executable_path = driver_path)
-                drvr.get(centre[3])
+                drvr.get(r[3])
 
+    if args.notify:
+        os_notify(title = 'Chronoslots scraper alert',
+            subtitle = '{} slots founds on {} centers'.format(total_slots_found, centers_with_slots),
+            message  = 'Check your terminal to clink on links!')
+
+
+def scrape():
+    start_time = datetime.now()
+
+    print(f"Retrieving list of proximity centers around {args.city} with a limit of {args.limit} pages...")
+    results = get_centers(city=str.lower(args.city), limit=args.limit)
     print()
-    print("Summary:")
-    print(f"Total slots available : {total_with_slots}")
-    print(f"Total browsed centers: {len(res)}")
-    print(f"Total execution time: {(stop_time_2 - start_time)} seconds")
+
+    links = []
+    for i in results:
+        links.append(i['link'])
+    nb_centers = len(links)
+
+    iteration = 1
+    print("[{}] {} : checking {} centers for available slots...".format(iteration, datetime.now(), nb_centers))
+    process_center_availabilities_once(links)
+
+    while args.background:
+        print()
+        print("...Waiting a minute before checking again...")
+        print()
+        time.sleep(60)
+        iteration += 1
+        print("[{}] {} : checking {} centers for available slots...".format(iteration, datetime.now(), nb_centers))
+        process_center_availabilities_once(links)
 
     if args.auto_browse != "None":
         input("Press Enter to continue...")
