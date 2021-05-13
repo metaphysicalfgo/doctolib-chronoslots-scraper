@@ -133,7 +133,7 @@ def process_center_availabilities_once(center_data_links, notify=False):
     centers_with_slots = 0
     total_slots_found = 0
     for r in res:
-        if int(r[0]) > 0:
+        if len(r) > 0 and int(r[0]) > 0:
             centers_with_slots += 1
             total_slots_found += int(r[0])
             print("ALERT:")
