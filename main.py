@@ -124,7 +124,10 @@ def retrieve_center_data(url: str):
         return center_data
 
 
-def process_center_availabilities_once(center_data_links, notify=False):
+def process_center_availabilities_once(center_data_links, iteration, notify=False):
+    print()
+    print("[{}] {} : checking {} centers for available slots...".format(iteration, datetime.now(), len(center_data_links)))
+
     proc_units = min((cpu_count() - 1), len(center_data_links))
     res = None
     with Pool(proc_units):
@@ -133,7 +136,7 @@ def process_center_availabilities_once(center_data_links, notify=False):
     centers_with_slots = 0
     total_slots_found = 0
     for r in res:
-        if len(r) > 0 and int(r[0]) > 0:
+        if r is not None and len(r) > 0 and int(r[0]) > 0:
             centers_with_slots += 1
             total_slots_found += int(r[0])
             print("ALERT:")
@@ -146,10 +149,12 @@ def process_center_availabilities_once(center_data_links, notify=False):
                 drvr = webdriver.Chrome(options = options, executable_path = driver_path)
                 drvr.get(r[3])
 
-    if args.notify:
+    if args.notify and total_slots_found > 0:
         os_notify(title = 'Chronoslots scraper alert',
             subtitle = '{} slots founds on {} centers'.format(total_slots_found, centers_with_slots),
             message  = 'Check your terminal to clink on links!')
+
+    print()
 
 
 def scrape():
@@ -157,25 +162,19 @@ def scrape():
 
     print(f"Retrieving list of proximity centers around {args.city} with a limit of {args.limit} pages...")
     results = get_centers(city=str.lower(args.city), limit=args.limit)
-    print()
 
     links = []
     for i in results:
         links.append(i['link'])
-    nb_centers = len(links)
 
     iteration = 1
-    print("[{}] {} : checking {} centers for available slots...".format(iteration, datetime.now(), nb_centers))
-    process_center_availabilities_once(links)
+    process_center_availabilities_once(links, iteration)
 
     while args.background:
-        print()
         print("...Waiting a minute before checking again...")
-        print()
         time.sleep(60)
         iteration += 1
-        print("[{}] {} : checking {} centers for available slots...".format(iteration, datetime.now(), nb_centers))
-        process_center_availabilities_once(links)
+        process_center_availabilities_once(links, iteration)
 
     if args.auto_browse != "None":
         input("Press Enter to continue...")
