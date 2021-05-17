@@ -109,20 +109,15 @@ def doctolib_link_finder(soup_object):
     return found_links
 
 
-def retrieve_center_data(url: str):
+def https_retrieve_center_data(url: str):
     conn = httpclient.HTTPSConnection(DOCTOLIB_URL)
     conn.request("GET", url)
     resp = conn.getresponse()
     resptext = resp.read().decode()
     if resptext is not None:
         respjson = json.loads(resptext)
-        if("search_result" in respjson):
-            center_data = []
-            center_data.append(respjson['total'])
-            center_data.append(respjson['search_result']['city'])
-            center_data.append(respjson['search_result']['last_name'])
-            center_data.append("https://{}{}".format(DOCTOLIB_URL, respjson['search_result']['link']))
-            return center_data
+        if("search_result" in respjson and int(respjson['total'])) > 0:
+            return respjson
 
 
 def process_center_availabilities_once(center_data_links, iteration, notify=False):
@@ -132,17 +127,23 @@ def process_center_availabilities_once(center_data_links, iteration, notify=Fals
     proc_units = min((cpu_count() - 1), len(center_data_links))
     res = None
     with Pool(proc_units):
-        res = p_map(retrieve_center_data, center_data_links)
+        res = p_map(https_retrieve_center_data, center_data_links)
 
-    centers_with_slots = 0
     total_slots_found = 0
+    total_with_slots = 0
     for r in res:
-        if r is not None and len(r) > 0 and int(r[0]) > 0:
-            centers_with_slots += 1
-            total_slots_found += int(r[0])
+        if r is not None and len(r) > 0:
+            total_slots_found += int(r['total'])
+            total_with_slots += 1
             print("ALERT:")
-            print("       {} slots available at {} ({})".format(r[0], r[2], r[1]))
-            print("       -> {}".format(r[3]))
+            print("\t{} slots available at {} ({} {})".format(
+                    r['total'], 
+                    r['search_result']['last_name'], 
+                    r['search_result']['city'], 
+                    r['search_result']['zipcode']))
+            print("\t-> https://{}{}".format(
+                    DOCTOLIB_URL, 
+                    r['search_result']['link']))
             if args.auto_browse == "Brave":
                 options = Options()
                 options.binary_location = '/Applications/Brave Browser.app/Contents/MacOS/Brave Browser'
@@ -152,7 +153,7 @@ def process_center_availabilities_once(center_data_links, iteration, notify=Fals
 
     if args.notify and total_slots_found > 0:
         os_notify(title = 'Chronoslots scraper alert',
-            subtitle = '{} slots founds on {} centers'.format(total_slots_found, centers_with_slots),
+            subtitle = '{} slots founds on {} centers'.format(total_slots_found, total_with_slots),
             message  = 'Check your terminal to clink on links!')
 
     print()
