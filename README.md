@@ -14,6 +14,7 @@ If you are not interested in scraping and just want to get a vaccine: please vis
 
 ```
 git clone https://github.com/metaphysicalfgo/doctolib-chronoslots-scraper.git
+cd doctolib-chronoslots-scraper
 pip3 install -r requirements.txt
 ```
 

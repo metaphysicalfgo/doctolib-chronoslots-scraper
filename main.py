@@ -114,14 +114,15 @@ def retrieve_center_data(url: str):
     conn.request("GET", url)
     resp = conn.getresponse()
     resptext = resp.read().decode()
-    respjson = json.loads(resptext)
-    if("search_result" in respjson):
-        center_data = []
-        center_data.append(respjson['total'])
-        center_data.append(respjson['search_result']['city'])
-        center_data.append(respjson['search_result']['last_name'])
-        center_data.append("https://{}{}".format(DOCTOLIB_URL, respjson['search_result']['link']))
-        return center_data
+    if resptext is not None:
+        respjson = json.loads(resptext)
+        if("search_result" in respjson):
+            center_data = []
+            center_data.append(respjson['total'])
+            center_data.append(respjson['search_result']['city'])
+            center_data.append(respjson['search_result']['last_name'])
+            center_data.append("https://{}{}".format(DOCTOLIB_URL, respjson['search_result']['link']))
+            return center_data
 
 
 def process_center_availabilities_once(center_data_links, iteration, notify=False):
