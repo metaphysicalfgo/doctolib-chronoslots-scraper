@@ -153,7 +153,7 @@ def process_center_availabilities_once(center_data_links, iteration, notify=Fals
                     r['search_result']['zipcode']))
             print("\t-> https://{}{}".format(
                     DOCTOLIB_URL, 
-                    r['search_result']['link']))
+                    r['search_result']['url']))
             if args.auto_browse == "Brave":
                 options = Options()
                 options.binary_location = '/Applications/Brave Browser.app/Contents/MacOS/Brave Browser'
