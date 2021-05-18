@@ -1,6 +1,6 @@
 import argparse
-import csv
 import os
+import sys
 import signal
 import json
 from datetime import datetime
@@ -18,6 +18,9 @@ import http.client as httpclient
 from bs4 import BeautifulSoup
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
+
+from plyer import notification
+
 
 import ssl
 ssl._create_default_https_context = ssl._create_unverified_context
@@ -41,6 +44,7 @@ desktop_agents = [
 
 DOCTOLIB_URL = "www.doctolib.fr"
 DOCTOLIB_CHRONODOSE_FILTER = "force_max_limit=2"
+VACCINE_ICON = "{}/{}".format(os.path.dirname(os.path.realpath(__file__)), "vaccine_ico.ico")
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--limit", type=int, default=5, help="Set the maximum number of Doctolib search pages")
@@ -56,10 +60,16 @@ def random_headers():
             'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8'}
 
 def os_notify(title, subtitle, message):
-    t = '-title {!r}'.format(title)
-    s = '-subtitle {!r}'.format(subtitle)
-    m = '-message {!r}'.format(message)
-    os.system('terminal-notifier {}'.format(' '.join([m, t, s])))
+    if sys.platform == "linux" or sys.platform == "linux2":
+        print("Linux notification not supported yet.")
+    elif sys.platform == "darwin":
+        t = '-title {!r}'.format(title)
+        s = '-subtitle {!r}'.format(subtitle)
+        m = '-message {!r}'.format(message)
+        os.system('terminal-notifier {}'.format(' '.join([m, t, s])))
+    elif sys.platform == "win32":
+        notification.notify(title=title, message=subtitle, app_icon=VACCINE_ICON, timeout=5)
+    
 
 def handler(signum, frame):
     print("Thanks for using me. Bye.")
@@ -152,9 +162,11 @@ def process_center_availabilities_once(center_data_links, iteration, notify=Fals
                 drvr.get(r[3])
 
     if args.notify and total_slots_found > 0:
-        os_notify(title = 'Chronoslots scraper alert',
+        os_notify(
+            title = 'Chronoslots scraper alert',
             subtitle = '{} slots founds on {} centers'.format(total_slots_found, total_with_slots),
-            message  = 'Check your terminal to clink on links!')
+            message  = 'Check your terminal to clink on links!'
+        )
 
     print()
 

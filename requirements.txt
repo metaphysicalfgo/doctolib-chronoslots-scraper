@@ -5,3 +5,4 @@ argparse
 html5lib
 p_tqdm
 selenium
+plyer

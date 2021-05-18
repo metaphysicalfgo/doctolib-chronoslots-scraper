@@ -38,7 +38,7 @@ Supported parameters:
 - `--limit` : change the number of pages of centers to browse (default is 5)
 - `--city` : the city to search centers around (default is Paris)
 - `--background` : this will make the script run until you stop it (availabilities on centers will be checked every minute)
-- `--notify` : you can enable this parameter to get a toaster on your MacOS X device if slots are found
+- `--notify` : you can enable this parameter to get a toaster (operating systems currently sypported: Windows and MacOS)
 - `--auto_browse` : please do not use unless you are on MacOS X with the Brave browser installed in the default application path (the only supported value is "Brave")
 
 Please note that writing output as a csv file has been deprecated as data is very volatile and thus is not very relevant. 
