@@ -77,6 +77,12 @@ def handler(signum, frame):
  
 signal.signal(signal.SIGINT, handler)
 
+def countdown(t):
+    while t:
+        print("...Waiting {} seconds before checking again...".format(t), end="\r")
+        time.sleep(1)
+        t -= 1
+      
 def get_centers(city, limit):
     results = []
     doctolib_url = "/vaccination-covid-19/{}?{}&ref_visit_motive_ids[]=6970&ref_visit_motive_ids[]=7005"
@@ -185,8 +191,7 @@ def scrape():
     process_center_availabilities_once(links, iteration)
 
     while args.background:
-        print("...Waiting a minute before checking again...")
-        time.sleep(60)
+        countdown(60)
         iteration += 1
         process_center_availabilities_once(links, iteration)
 
