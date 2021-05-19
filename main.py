@@ -55,6 +55,8 @@ parser.add_argument("--notify", type=bool, default=False, help="WARN: currently 
 
 args = parser.parse_args()
 
+conn = httpclient.HTTPSConnection(DOCTOLIB_URL)
+
 def random_headers():
     return {'User-Agent': choice(desktop_agents),
             'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8'}
@@ -72,6 +74,8 @@ def os_notify(title, subtitle, message):
     
 
 def handler(signum, frame):
+    global conn
+    conn.close()
     print("Thanks for using me. Bye.")
     exit(1)
  
@@ -84,12 +88,12 @@ def countdown(t):
         t -= 1
       
 def get_centers(city, limit):
+    global conn
     results = []
     doctolib_url = "/vaccination-covid-19/{}?{}&ref_visit_motive_ids[]=6970&ref_visit_motive_ids[]=7005"
     doctolib_url_2 = "/vaccination-covid-19/{}?page={}&{}&ref_visit_motive_ids[]=6970&ref_visit_motive_ids[]=7005"
     max_nb_page = limit
 
-    conn = httpclient.HTTPSConnection(DOCTOLIB_URL)
     conn.request("GET", doctolib_url.format(city, DOCTOLIB_CHRONODOSE_FILTER), headers=random_headers())
     resptext = conn.getresponse().read().decode()
     soup = BeautifulSoup(resptext, 'html5lib')
@@ -126,7 +130,7 @@ def doctolib_link_finder(soup_object):
 
 
 def https_retrieve_center_data(url: str):
-    conn = httpclient.HTTPSConnection(DOCTOLIB_URL)
+    global conn
     conn.request("GET", url)
     resp = conn.getresponse()
     resptext = resp.read().decode()
@@ -177,9 +181,7 @@ def process_center_availabilities_once(center_data_links, iteration, notify=Fals
     print()
 
 
-def scrape():
-    start_time = datetime.now()
-
+if __name__ == "__main__":
     print(f"Retrieving list of proximity centers around {args.city} with a limit of {args.limit} pages...")
     results = get_centers(city=str.lower(args.city), limit=args.limit)
 
@@ -197,7 +199,3 @@ def scrape():
 
     if args.auto_browse != "None":
         input("Press Enter to continue...")
-    
-
-if __name__ == "__main__":
-    scrape()
