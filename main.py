@@ -133,7 +133,8 @@ def doctolib_link_finder(soup_object):
 
 
 def https_retrieve_center_data(url: str):
-    global conn
+    # We must create a new instance of conn each time. See issue #3.
+    conn = httpclient.HTTPSConnection(DOCTOLIB_URL)
     conn.request("GET", url)
     resp = conn.getresponse()
     resptext = resp.read().decode()
