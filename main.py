@@ -3,6 +3,7 @@ import os
 import sys
 import signal
 import json
+import unicodedata
 from datetime import datetime
 import time
 from functools import reduce
@@ -72,6 +73,8 @@ def os_notify(title, subtitle, message):
     elif sys.platform == "win32":
         notification.notify(title=title, message=subtitle, app_icon=VACCINE_ICON, timeout=5)
     
+def strip_accents(s):
+    return ''.join(c for c in unicodedata.normalize('NFD', s) if unicodedata.category(c) != 'Mn')
 
 def handler(signum, frame):
     global conn
@@ -183,7 +186,7 @@ def process_center_availabilities_once(center_data_links, iteration, notify=Fals
 
 if __name__ == "__main__":
     print(f"Retrieving list of proximity centers around {args.city} with a limit of {args.limit} pages...")
-    results = get_centers(city=str.lower(args.city), limit=args.limit)
+    results = get_centers(city=strip_accents(str.lower(args.city)), limit=args.limit)
 
     links = []
     for i in results:
